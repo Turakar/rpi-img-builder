@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -e
+
+# Touchscreen
+sed -i /boot/config.txt -e "s/^#dtparam=spi=on/dtparam=spi=on/"
+# maybe hdmi_force_hotplug
+# maybe dtparam=i2c_arm=on
+# maybe enable_uart=1
+
+echo "
+# Kuman Touchscreen 3.5\"
+dtoverlay=tft35a:rotate=270
+dtoverlay=ads7846,cs=1,penirq=17,penirq_pull=2,speed=1000000,keep_vref_on=1,swapxy=1,pmax=255,xohms=60,xmin=200,xmax=3900,ymin=200,ymax=3900" >> /boot/config.txt
+
+echo "dwc_otg.lpm_enable=0 console=tty1 console=ttyAMA0,115200 root=/dev/mmcblk0p2 rootfstype=ext4 elevator=deadline rootwait fbcon=map:10 fbcon=font:ProFont6x11 logo.nologo" > /boot/cmdline.txt
+
+# Actual Installation
+mkdir /opt/pipresenter/work
+chmod -R 777 /opt/pipresenter/work
+chown -R pi:pi /opt/pipresenter
+
+/opt/pipresenter/material/usewheezysdl.sh
+
+sed -i '/exit 0/i \
+/root/onstick.sh' /etc/usbmount/mount.d/00_create_model_symlink
+sed -i '/exit 0/i \
+/root/onstickremove.sh' /etc/usbmount/umount.d/00_remove_model_symlink
+
+adduser present
+passwd -d present
+adduser present video
+adduser present users
+adduser present input
+
+cp /opt/pipresenter/material/.bashrc /home/present/.bashrc
+chattr +i /home/present/.bashrc
