@@ -5,7 +5,11 @@ set -e
 # NOTE: This script is run within the chroot after second stage debootstrap!
 #
 
-set -e
+# Make sure we are chrooted
+if [ "$(stat -c %d:%i /)" = "$(stat -c %d:%i /proc/1/root/.)" ]; then
+	echo "Something went wrong and we aren't in a chroot, to save your system from damage the script will fail and exit now."
+	exit 1;
+fi
 
 if [ "$#" -lt 8 ]; then
 	echo "Usage: $0 DIST ARCH LOCALE UNAME UPASS RPASS INC_REC UBOOT_DIR"
@@ -29,6 +33,8 @@ LANG=C
 
 # Make dpkg/apt-get noninteractive
 export DEBIAN_FRONTEND=noninteractive
+export DEBCONF_NONINTERACTIVE_SEEN=true
+export LC_ALL=C LANGUAGE=C LANG=C
 export FLASH_KERNEL_SKIP=1
 export RIB_DIST=${DIST}
 if [ "${UBOOT_DIR}" = "rpi_3" ]; then
@@ -44,18 +50,16 @@ exit 101
 chmod +x /usr/sbin/policy-rc.d
 
 # Set the locale
-ln -s /usr/share/i18n/SUPPORTED /etc/locale.gen
-sed -i -e 's/^ *[a-zA-Z]/# &/' /etc/locale.gen
-sed -i "s/^#[[:space:]]*${LOCALE}\(.*\)/${LOCALE}\1/g" /etc/locale.gen
 echo "LANG=${LOCALE}" >> /etc/default/locale
 echo "locales locales/default_environment_locale select ${LOCALE}" | debconf-set-selections
 echo "locales locales/locales_to_be_generated select ${LOCALE} UTF-8" | debconf-set-selections
-locale-gen
 
 # Finish multistrap
 /var/lib/dpkg/info/base-passwd.preinst install
 /var/lib/dpkg/info/dash.preinst install
-dpkg --force-all --configure debconf mawk
+dpkg --force-all --configure apt-utils || true
+dpkg --force-all --configure debconf || true
+dpkg --force-all --configure mawk || true
 dpkg --configure -a
 
 # Set root password
@@ -114,7 +118,7 @@ else
 fi
 
 # Re-enable services to start
-rm /usr/sbin/policy-rc.d
+rm -f /usr/sbin/policy-rc.d
 
 # Cleanup
 echo "Running clean up"
